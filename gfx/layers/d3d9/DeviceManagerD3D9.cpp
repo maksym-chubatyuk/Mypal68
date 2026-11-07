@@ -9,6 +9,7 @@
 #include "gfxPlatform.h"
 #include "gfxWindowsPlatform.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/WindowsVersion.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "nsIConsoleService.h"
@@ -226,7 +227,11 @@ bool DeviceManagerD3D9::Initialize() {
       (decltype(Direct3DCreate9Ex) *)GetProcAddress(d3d9, "Direct3DCreate9Ex");
 
 #ifdef USE_D3D9EX
-  if (d3d9CreateEx) {
+  // Windows XP has no D3D9Ex. If Direct3DCreate9Ex is exported there anyway it
+  // comes from a compatibility layer (One-Core-API forwards it to a Wine-based
+  // D3D9 on top of OpenGL), which is much slower than the native driver and
+  // crashes on shutdown, so stick with plain Direct3DCreate9.
+  if (d3d9CreateEx && IsVistaOrLater()) {
     hr = d3d9CreateEx(D3D_SDK_VERSION, getter_AddRefs(mD3D9Ex));
     if (SUCCEEDED(hr)) {
       mD3D9 = mD3D9Ex;

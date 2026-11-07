@@ -48,7 +48,7 @@ pref("extensions.geckoProfiler.acceptedExtensionIds", "geckoprofiler@mozilla.com
 pref("extensions.webextensions.base-content-security-policy", "script-src 'self' https://* moz-extension: blob: filesystem: 'unsafe-eval' 'unsafe-inline'; object-src 'self' https://* moz-extension: blob: filesystem:;");
 pref("extensions.webextensions.default-content-security-policy", "script-src 'self'; object-src 'self';");
 
-pref("extensions.webextensions.remote", true);
+pref("extensions.webextensions.remote", false);
 pref("extensions.webextensions.background-delayed-startup", true);
 
 // Disable extensionStorage storage actor by default
@@ -412,7 +412,7 @@ pref("browser.tabs.delayHidingAudioPlayingIconMS", 3000);
 
 // Pref to control whether we use separate privileged content processes.
 #if defined(NIGHTLY_BUILD) && !defined(MOZ_ASAN)
-  pref("browser.tabs.remote.separatePrivilegedContentProcess", true);
+  pref("browser.tabs.remote.separatePrivilegedContentProcess", false);
 // This pref will cause assertions when a remoteType triggers a process switch
 // to a new remoteType it should not be able to trigger.
   pref("browser.tabs.remote.enforceRemoteTypeRestrictions", true);
@@ -728,7 +728,7 @@ pref("browser.sessionstore.resume_session_once", false);
 pref("browser.sessionstore.resuming_after_os_restart", false);
 
 // Minimal interval between two save operations in milliseconds (while the user is active).
-pref("browser.sessionstore.interval", 15000); // 15 seconds
+pref("browser.sessionstore.interval", 60000); // 60 seconds
 
 // Minimal interval between two save operations in milliseconds (while the user is idle).
 pref("browser.sessionstore.interval.idle", 3600000); // 1h
@@ -1144,7 +1144,7 @@ pref("prompts.tab_modal.enabled", true);
 pref("browser.newtab.preload", true);
 
 // Indicates if about:newtab shows content (enabled) or just blank
-pref("browser.newtabpage.enabled", true);
+pref("browser.newtabpage.enabled", false);
 
 // Activity Stream prefs that control to which page to redirect
 pref("browser.newtabpage.activity-stream.prerender", false);
@@ -1418,7 +1418,8 @@ pref("privacy.webrtc.allowSilencingNotifications", false);
 pref("privacy.webrtc.legacyGlobalIndicator", true);
 
 // Start the browser in e10s mode
-pref("browser.tabs.remote.autostart", true);
+// Single process: on 1GB Windows XP machines e10s costs ~250MB of commit.
+pref("browser.tabs.remote.autostart", false);
 pref("browser.tabs.remote.desktopbehavior", true);
 
 // Run media transport in a separate process?
@@ -1430,7 +1431,7 @@ pref("browser.tabs.remote.desktopbehavior", true);
 
 // For speculatively warming up tabs to improve perceived
 // performance while using the async tab switcher.
-pref("browser.tabs.remote.warmup.enabled", true);
+pref("browser.tabs.remote.warmup.enabled", false);
 
 // Caches tab layers to improve perceived performance
 // of tab switches.
@@ -1477,7 +1478,7 @@ pref("browser.esedbreader.loglevel", "Error");
 
 pref("browser.laterrun.enabled", false);
 
-pref("dom.ipc.processPrelaunch.enabled", true);
+pref("dom.ipc.processPrelaunch.enabled", false);
 
 // See comments in bug 1340115 on how we got to these numbers.
 pref("browser.migrate.chrome.history.limit", 2000);
@@ -1939,3 +1940,54 @@ pref("devtools.debugger.features.async-live-stacks", false);
 // This is currently not exposed by any UI to avoid making
 // about:devtools-toolbox tabs unusable by mistake.
 pref("devtools.popup.disable_autohide", false);
+
+// Low-end tuning (Pentium 4 / 1GB RAM / Windows XP): keep a YouTube tab with an
+// ad blocker well under 1GB of total system commit.
+pref("dom.ipc.processCount", 1);
+pref("dom.ipc.keepProcessesAlive.web", 0);
+// XP has no DWM, so Gecko drives a software vsync timer; 30Hz halves the
+// compositor and refresh driver work and is enough for 24/30fps video.
+pref("layout.frame_rate", 30);
+pref("browser.newtabpage.activity-stream.feeds.topsites", false);
+pref("browser.newtabpage.activity-stream.feeds.section.highlights", false);
+pref("browser.newtabpage.activity-stream.feeds.snippets", false);
+pref("browser.newtabpage.activity-stream.feeds.section.topstories", false);
+pref("browser.newtabpage.activity-stream.feeds.telemetry", false);
+pref("browser.newtabpage.activity-stream.telemetry", false);
+pref("browser.pagethumbnails.capturing_disabled", true);
+pref("browser.sessionhistory.max_total_viewers", 0);
+pref("browser.cache.memory.capacity", 16384);
+pref("image.mem.surfacecache.max_size_kb", 65536);
+pref("media.memory_cache_max_size", 4096);
+pref("media.memory_caches_combined_limit_kb", 65536);
+pref("media.cache_size", 65536);
+pref("media.mediasource.eviction_threshold.video", 31457280);
+pref("media.mediasource.eviction_threshold.audio", 8388608);
+// Collect at ~1.2-1.5x the live JS heap instead of up to 3x; with the defaults a
+// playing YouTube tab grew by ~0.7MB/s until a tab switch forced a GC.
+pref("javascript.options.mem.gc_small_heap_size_max_mb", 50);
+pref("javascript.options.mem.gc_large_heap_size_min_mb", 200);
+pref("javascript.options.mem.gc_high_frequency_small_heap_growth", 150);
+pref("javascript.options.mem.gc_high_frequency_large_heap_growth", 120);
+pref("javascript.options.mem.gc_low_frequency_heap_growth", 120);
+pref("javascript.options.mem.gc_allocation_threshold_mb", 16);
+pref("javascript.options.mem.gc_malloc_threshold_base_mb", 24);
+pref("javascript.options.mem.gc_max_empty_chunk_count", 4);
+pref("javascript.options.mem.gc_max_helper_threads", 1);
+pref("network.predictor.enabled", false);
+pref("network.prefetch-next", false);
+pref("network.dns.disablePrefetch", true);
+pref("network.http.speculative-parallel-limit", 0);
+pref("browser.safebrowsing.malware.enabled", false);
+pref("browser.safebrowsing.phishing.enabled", false);
+pref("browser.safebrowsing.blockedURIs.enabled", false);
+pref("browser.safebrowsing.downloads.enabled", false);
+pref("browser.safebrowsing.passwords.enabled", false);
+pref("browser.safebrowsing.provider.google4.updateURL", "");
+pref("browser.safebrowsing.provider.google.updateURL", "");
+pref("browser.safebrowsing.provider.mozilla.updateURL", "");
+pref("toolkit.telemetry.enabled", false);
+pref("toolkit.telemetry.unified", false);
+pref("datareporting.healthreport.uploadEnabled", false);
+pref("datareporting.policy.dataSubmissionEnabled", false);
+pref("accessibility.force_disabled", 1);

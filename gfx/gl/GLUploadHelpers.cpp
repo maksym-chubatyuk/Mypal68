@@ -220,16 +220,21 @@ static void TexSubImage2DHelper(GLContext* gl, GLenum target, GLint level,
                                          width, height, stride, pixelsize,
                                          format, type, pixels);
     }
+  } else if (stride != width * pixelsize) {
+    // desktop GL (non-ES) path with padded rows. Old drivers (e.g. ATI R300 on
+    // Windows XP) convert every texel in software when GL_UNPACK_ROW_LENGTH
+    // or alignment padding is in effect, which made each 480p video plane
+    // upload ~10x slower than a tightly packed one. Repack instead.
+    TexSubImage2DWithoutUnpackSubimage(gl, target, level, xoffset, yoffset,
+                                       width, height, stride, pixelsize,
+                                       format, type, pixels);
   } else {
     // desktop GL (non-ES) path
     gl->fPixelStorei(LOCAL_GL_UNPACK_ALIGNMENT,
                      std::min(GetAddressAlignment((ptrdiff_t)pixels),
                               GetAddressAlignment((ptrdiff_t)stride)));
-    int rowLength = stride / pixelsize;
-    gl->fPixelStorei(LOCAL_GL_UNPACK_ROW_LENGTH, rowLength);
     gl->fTexSubImage2D(target, level, xoffset, yoffset, width, height, format,
                        type, pixels);
-    gl->fPixelStorei(LOCAL_GL_UNPACK_ROW_LENGTH, 0);
     gl->fPixelStorei(LOCAL_GL_UNPACK_ALIGNMENT, 4);
   }
 }
@@ -302,17 +307,21 @@ static void TexImage2DHelper(GLContext* gl, GLenum target, GLint level,
       TexSubImage2DHelper(gl, target, level, 0, 0, width, height, stride,
                           pixelsize, format, type, pixels);
     }
+  } else if (stride != width * pixelsize) {
+    // desktop GL (non-ES) path with padded rows: allocate, then upload through
+    // TexSubImage2DHelper, which repacks (see the comment there).
+    gl->fTexImage2D(target, level, internalformat, width, height, border,
+                    format, type, nullptr);
+    TexSubImage2DHelper(gl, target, level, 0, 0, width, height, stride,
+                        pixelsize, format, type, pixels);
   } else {
     // desktop GL (non-ES) path
 
     gl->fPixelStorei(LOCAL_GL_UNPACK_ALIGNMENT,
                      std::min(GetAddressAlignment((ptrdiff_t)pixels),
                               GetAddressAlignment((ptrdiff_t)stride)));
-    int rowLength = stride / pixelsize;
-    gl->fPixelStorei(LOCAL_GL_UNPACK_ROW_LENGTH, rowLength);
     gl->fTexImage2D(target, level, internalformat, width, height, border,
                     format, type, pixels);
-    gl->fPixelStorei(LOCAL_GL_UNPACK_ROW_LENGTH, 0);
     gl->fPixelStorei(LOCAL_GL_UNPACK_ALIGNMENT, 4);
   }
 }
@@ -331,6 +340,14 @@ SurfaceFormat UploadImageDataToTexture(
   GLenum type = 0;
   int32_t pixelSize = BytesPerPixel(aFormat);
   SurfaceFormat surfaceFormat = gfx::SurfaceFormat::UNKNOWN;
+#ifdef XP_WIN
+  // Same byte order as UNSIGNED_INT_8_8_8_8_REV on little-endian x86, but old
+  // Windows drivers (ATI R300 on XP) only fast-path UNSIGNED_BYTE; the packed
+  // type goes through a per-texel conversion that is ~7x slower.
+  const GLenum bgraType = LOCAL_GL_UNSIGNED_BYTE;
+#else
+  const GLenum bgraType = LOCAL_GL_UNSIGNED_INT_8_8_8_8_REV;
+#endif
 
   MOZ_ASSERT(gl->GetPreferredARGB32Format() == LOCAL_GL_BGRA ||
              gl->GetPreferredARGB32Format() == LOCAL_GL_RGBA);
@@ -340,7 +357,7 @@ SurfaceFormat UploadImageDataToTexture(
       if (gl->GetPreferredARGB32Format() == LOCAL_GL_BGRA) {
         format = LOCAL_GL_BGRA;
         surfaceFormat = SurfaceFormat::R8G8B8A8;
-        type = LOCAL_GL_UNSIGNED_INT_8_8_8_8_REV;
+        type = bgraType;
       } else {
         format = LOCAL_GL_RGBA;
         surfaceFormat = SurfaceFormat::B8G8R8A8;
@@ -354,7 +371,7 @@ SurfaceFormat UploadImageDataToTexture(
       if (gl->GetPreferredARGB32Format() == LOCAL_GL_BGRA) {
         format = LOCAL_GL_BGRA;
         surfaceFormat = SurfaceFormat::R8G8B8X8;
-        type = LOCAL_GL_UNSIGNED_INT_8_8_8_8_REV;
+        type = bgraType;
       } else {
         format = LOCAL_GL_RGBA;
         surfaceFormat = SurfaceFormat::B8G8R8X8;
@@ -367,7 +384,7 @@ SurfaceFormat UploadImageDataToTexture(
         // Upload our RGBA as BGRA, but store that the uploaded format is
         // BGRA. (sample from R to get B)
         format = LOCAL_GL_BGRA;
-        type = LOCAL_GL_UNSIGNED_INT_8_8_8_8_REV;
+        type = bgraType;
         surfaceFormat = SurfaceFormat::B8G8R8A8;
       } else {
         format = LOCAL_GL_RGBA;
@@ -381,7 +398,7 @@ SurfaceFormat UploadImageDataToTexture(
       // format used.
       if (gl->GetPreferredARGB32Format() == LOCAL_GL_BGRA) {
         format = LOCAL_GL_BGRA;
-        type = LOCAL_GL_UNSIGNED_INT_8_8_8_8_REV;
+        type = bgraType;
         surfaceFormat = SurfaceFormat::B8G8R8X8;
       } else {
         format = LOCAL_GL_RGBA;

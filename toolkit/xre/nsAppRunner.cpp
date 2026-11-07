@@ -4322,11 +4322,10 @@ bool BrowserTabsRemoteAutostart() {
     return gBrowserTabsRemoteAutostart;
   }
 
-#if defined(MOZILLA_OFFICIAL) && MOZ_BUILD_APP_IS_BROWSER
-  bool allowSingleProcessOutsideAutomation = false;
-#else
+  // Mypal: always honor browser.tabs.remote.autostart. Single-process mode
+  // saves ~250MB on 1GB Windows XP machines, which is the difference between
+  // fitting in RAM and swapping.
   bool allowSingleProcessOutsideAutomation = true;
-#endif
 
   int status = kE10sEnabledByDefault;
   // We use "are non-local connections disabled" as a proxy for
